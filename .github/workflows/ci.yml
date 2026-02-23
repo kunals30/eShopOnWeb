@@ -28,6 +28,17 @@ jobs:
     - name: Build solution
       run: dotnet build eShopOnWeb.sln --no-restore --configuration Release
 
+    #SonarCloud Scan
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      with:
+        args: >
+      -Dsonar.projectKey=kunals30
+      -Dsonar.organization=Kunal Shinde
+      -Dsonar.host.url=https://sonarcloud.io
+
     # Run Tests with Coverage
     - name: Run Tests with Coverage
       run: dotnet test eShopOnWeb.sln --configuration Release --collect:"XPlat Code Coverage"
