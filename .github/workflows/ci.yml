@@ -74,4 +74,17 @@ jobs:
         -t $IMAGE_NAME \
         .
 
-        docker push $IMAGE_NAME
+    - name: Scan Docker Image with Trivy
+      uses: aquasecurity/trivy-action@0.24.0
+      with:
+        image-ref: ${{ secrets.ACR_LOGIN_SERVER }}/eshop:${{ github.run_number }}
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        severity: 'CRITICAL,HIGH'
+
+    - name: Push Docker Image
+      run: |
+         IMAGE_NAME=${{ secrets.ACR_LOGIN_SERVER }}/eshop:${{ github.run_number }}
+         docker push $IMAGE_NAME
+
