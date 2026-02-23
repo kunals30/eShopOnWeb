@@ -1,36 +1,42 @@
-name: .NET CI
+name: .NET CI + Docker
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  build:
+  build-test-docker:
     runs-on: ubuntu-latest
 
     steps:
+    # Checkout code
     - name: Checkout code
       uses: actions/checkout@v4
 
+    # Setup .NET
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
 
+    # Restore
     - name: Restore dependencies
-      run: dotnet restore eShopOnWeb.sln
+      run: dotnet restore
 
-    - name: Build
-      run: dotnet build eShopOnWeb.sln --no-restore --configuration Release -warnaserror:false
+    # Build
+    - name: Build solution
+      run: dotnet build --no-restore --configuration Release
 
+    # Run Tests with Coverage
     - name: Run Tests with Coverage
-      run: dotnet test eShopOnWeb.sln --collect:"XPlat Code Coverage"
+      run: dotnet test --configuration Release --collect:"XPlat Code Coverage"
 
+    # Install ReportGenerator
     - name: Install ReportGenerator
       run: dotnet tool install -g dotnet-reportgenerator-globaltool
 
+    # Generate HTML Coverage Report
     - name: Generate HTML Coverage Report
       run: |
         reportgenerator \
@@ -38,8 +44,33 @@ jobs:
           -targetdir:coveragereport \
           -reporttypes:Html
 
+    # Upload Coverage HTML Artifact
     - name: Upload Coverage HTML Report
       uses: actions/upload-artifact@v4
       with:
         name: coverage-html-report
         path: coveragereport
+
+    # Set Docker Image Version = GitHub Run Number
+    - name: Set Build Version
+      id: version
+      run: echo "VERSION=${{ github.run_number }}" >> $GITHUB_OUTPUT
+
+    # Login to Azure Container Registry
+    - name: Login to Azure Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ secrets.ACR_LOGIN_SERVER }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    # Build and Push Docker Image
+    - name: Build and Push Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: src/Web/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.ACR_LOGIN_SERVER }}/eshop:${{ steps.version.outputs.VERSION }}
+          ${{ secrets.ACR_LOGIN_SERVER }}/eshop:latest
