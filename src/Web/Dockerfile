@@ -1,25 +1,26 @@
-# -------- BUILD STAGE --------
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
  
-# Copy solution and project files
-COPY ../../eShopOnWeb.sln .
-COPY ../ApplicationCore/ApplicationCore.csproj ApplicationCore/
-COPY ../Infrastructure/Infrastructure.csproj Infrastructure/
-COPY Web.csproj Web/
+# Copy solution
+COPY eShopOnWeb.sln .
  
-# Restore dependencies
-RUN dotnet restore Web/Web.csproj
+# Copy project files
+COPY src/ApplicationCore/ApplicationCore.csproj src/ApplicationCore/
+COPY src/Infrastructure/Infrastructure.csproj src/Infrastructure/
+COPY src/Web/Web.csproj src/Web/
  
-# Copy everything
+# Restore
+RUN dotnet restore eShopOnWeb.sln
+ 
+# Copy everything else
 COPY . .
-WORKDIR /src/Web
  
-# Publish app
+WORKDIR /src/src/Web
 RUN dotnet publish -c Release -o /app/publish
  
-# -------- RUNTIME STAGE --------
+# Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
+ 
 ENTRYPOINT ["dotnet", "Web.dll"]

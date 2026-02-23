@@ -66,11 +66,12 @@ jobs:
 
     # Build and Push Docker Image
     - name: Build and Push Docker Image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: src/Web/Dockerfile
-        push: true
-        tags: |
-          ${{ secrets.ACR_LOGIN_SERVER }}/eshop:${{ steps.version.outputs.VERSION }}
-          ${{ secrets.ACR_LOGIN_SERVER }}/eshop:latest
+      run: |
+        IMAGE_NAME=${{ secrets.ACR_LOGIN_SERVER }}/eshop:${{ github.run_number }}
+
+        docker build \
+        -f src/Web/Dockerfile \
+        -t $IMAGE_NAME \
+        .
+
+        docker push $IMAGE_NAME
