@@ -4,7 +4,6 @@ on:
   push:
     branches: [ main ]
   pull_request:
-
     branches: [ main ]
 
 jobs:
@@ -26,5 +25,11 @@ jobs:
     - name: Build
       run: dotnet build eShopOnWeb.sln --no-restore --configuration Release -warnaserror:false
 
-    - name: Run Tests
-      run: dotnet test eShopOnWeb.sln --no-build --verbosity normal
+    - name: Run Tests with Coverage
+      run: dotnet test eShopOnWeb.sln --no-build --collect:"XPlat Code Coverage"
+
+    - name: Upload Coverage Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: code-coverage-report
+        path: '**/TestResults/**/coverage.cobertura.xml'
