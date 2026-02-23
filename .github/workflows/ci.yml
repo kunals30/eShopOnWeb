@@ -8,94 +8,82 @@ on:
 jobs:
   build-test-docker:
     runs-on: ubuntu-latest
-
     steps:
-    # Checkout code
-    - name: Checkout code
-      uses: actions/checkout@v4
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for better SonarCloud analysis
 
-    # Setup .NET
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
+      # 2. Setup .NET
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
-    # Restore
-    - name: Restore dependencies
-      run: dotnet restore eShopOnWeb.sln
+      # 3. Restore
+      - name: Restore dependencies
+        run: dotnet restore eShopOnWeb.sln
 
-    # Build
-    - name: Build solution
-      run: dotnet build eShopOnWeb.sln --no-restore --configuration Release
+      # 4. Build
+      - name: Build solution
+        run: dotnet build eShopOnWeb.sln --no-restore --configuration Release
 
-    #SonarCloud Scan
-    - name: SonarCloud Scan
-      uses: SonarSource/sonarcloud-github-action@master
-      env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      with:
-        args: >
-     -Dsonar.projectKey=kunals30_eShopOnWeb
-     -Dsonar.organization=kunals30
-     -Dsonar.host.url=https://sonarcloud.io
+      # 5. SonarCloud Scan
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=kunals30_eShopOnWeb
+            -Dsonar.organization=kunals30
+            -Dsonar.host.url=https://sonarcloud.io
 
-    # Run Tests with Coverage
-    - name: Run Tests with Coverage
-      run: dotnet test eShopOnWeb.sln --configuration Release --collect:"XPlat Code Coverage"
+      # 6. Run Tests with Coverage
+      - name: Run Tests with Coverage
+        run: dotnet test eShopOnWeb.sln --configuration Release --collect:"XPlat Code Coverage"
 
-    # Install ReportGenerator
-    - name: Install ReportGenerator
-      run: dotnet tool install -g dotnet-reportgenerator-globaltool
+      # 7. Generate Coverage Report
+      - name: Generate HTML Coverage Report
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          reportgenerator -reports:**/coverage.cobertura.xml -targetdir:coveragereport -reporttypes:Html
 
-    # Generate HTML Coverage Report
-    - name: Generate HTML Coverage Report
-      run: |
-        reportgenerator \
-          -reports:**/coverage.cobertura.xml \
-          -targetdir:coveragereport \
-          -reporttypes:Html
+      # 8. Upload Coverage Artifact
+      - name: Upload Coverage HTML Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html-report
+          path: coveragereport
 
-    # Upload Coverage HTML Artifact
-    - name: Upload Coverage HTML Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-html-report
-        path: coveragereport
+      # 9. Login to Azure Container Registry
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
-    # Set Docker Image Version = GitHub Run Number
-    - name: Set Build Version
-      id: version
-      run: echo "VERSION=${{ github.run_number }}" >> $GITHUB_OUTPUT
+      # 10. Build Docker Image
+      - name: Build Docker Image
+        run: |
+          IMAGE_NAME=${{ secrets.ACR_LOGIN_SERVER }}/eshop:${{ github.run_number }}
+          docker build -f src/Web/Dockerfile -t $IMAGE_NAME .
 
-    # Login to Azure Container Registry
-    - name: Login to Azure Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ secrets.ACR_LOGIN_SERVER }}
-        username: ${{ secrets.ACR_USERNAME }}
-        password: ${{ secrets.ACR_PASSWORD }}
+      # 11. Scan Docker Image (Trivy)
+      - name: Scan Docker Image with Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ secrets.ACR_LOGIN_SERVER }}/eshop:${{ github.run_number }}
+          format: 'table'
+          exit-code: '0' # Set to 1 if you want to fail the build on vulnerabilities
+          ignore-unfixed: true
+          severity: 'CRITICAL'
 
-    # Build and Push Docker Image
-    - name: Build and Push Docker Image
-      run: |
-        IMAGE_NAME=${{ secrets.ACR_LOGIN_SERVER }}/eshop:${{ github.run_number }}
-
-        docker build \
-        -f src/Web/Dockerfile \
-        -t $IMAGE_NAME \
-        .
-
-    - name: Scan Docker Image with Trivy
-      uses: aquasecurity/trivy-action@0.24.0
-      with:
-        image-ref: ${{ secrets.ACR_LOGIN_SERVER }}/eshop:${{ github.run_number }}
-        format: 'table'
-        exit-code: '0'
-        ignore-unfixed: true
-        severity: 'CRITICAL'
-
-    - name: Push Docker Image
-      run: |
-         IMAGE_NAME=${{ secrets.ACR_LOGIN_SERVER }}/eshop:${{ github.run_number }}
-         docker push $IMAGE_NAME
-
+      # 12. Push Docker Image
+      - name: Push Docker Image
+        run: |
+          IMAGE_NAME=${{ secrets.ACR_LOGIN_SERVER }}/eshop:${{ github.run_number }}
+          docker push $IMAGE_NAME
