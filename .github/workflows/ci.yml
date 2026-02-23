@@ -22,15 +22,15 @@ jobs:
 
     # Restore
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore eShopOnWeb.sln
 
     # Build
     - name: Build solution
-      run: dotnet build --no-restore --configuration Release
+      run: dotnet build eShopOnWeb.sln --no-restore --configuration Release
 
     # Run Tests with Coverage
     - name: Run Tests with Coverage
-      run: dotnet test --configuration Release --collect:"XPlat Code Coverage"
+      run: dotnet test eShopOnWeb.sln --configuration Release --collect:"XPlat Code Coverage"
 
     # Install ReportGenerator
     - name: Install ReportGenerator
